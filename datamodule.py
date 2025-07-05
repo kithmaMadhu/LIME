@@ -36,7 +36,21 @@ class PseudoDataset(Dataset):
         input_mask = input.attention_mask.squeeze(0)
         confidence = torch.tensor(sample["confidence"]) if "confidence" in sample else 0
 
-        return label, confidence, input_ids, input_mask
+        item = {
+            "input_ids": input_ids,
+            "attention_mask": input_mask,
+            "label": torch.tensor(sample["prediction"])
+            }
+
+        # Handle confidence weight if present
+        if "confidence" in sample:
+            conf = sample["confidence"]
+            if isinstance(conf, list): # multi-class softmax case
+                conf = conf[sample["prediction"]]
+            item["weight"] = torch.tensor(conf, dtype=torch.float)
+        else:
+            item["weight"] = torch.tensor(1.0)
+        return item
 
 
 if __name__ == "__main__":

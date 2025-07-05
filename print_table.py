@@ -47,6 +47,7 @@ if __name__ == "__main__":
         # "nsp",
         "rnsp",
         "qa",
+        "student" 
         # "qa_what",
         # "qa_article",
     ]
@@ -61,7 +62,8 @@ if __name__ == "__main__":
         row_texts = [title_text]
         print(model_type if model_type == "soft" else "hard")
         for model in models:
-            table_row = [f"{model:10s}"]
+            table_label = "ST-" + model if model == "student" else model
+            table_row = [f"{table_label:10s}"]
             for dataset in datasets:
                 is_soft = model_type == "soft"
                 soft_model_key = get_model_key(dataset, model, 0, True)

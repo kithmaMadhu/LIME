@@ -54,9 +54,18 @@ class BertCategorizerModel(LightningModule):
         return loss, out
 
     def training_step(self, batch, batch_idx):
-        loss, _ = self.run_batch(batch, batch_idx)
-        self.log("train_loss", loss)
-        return loss
+        input_ids = batch["input_ids"]
+        attention_mask = batch["attention_mask"]
+        labels = batch["label"]
+        weights = batch.get("weight", torch.ones_like(labels).float())
+
+        logits = self(input_ids=input_ids, attention_mask=attention_mask)
+        loss_fn = torch.nn.CrossEntropyLoss(reduction='none')
+        losses = loss_fn(logits, labels)
+        weighted_loss = (losses * weights).mean()
+
+        self.log("train_loss", weighted_loss)
+        return weighted_loss
 
     def validation_step(self, batch, batch_idx):
         loss, _ = self.run_batch(batch, batch_idx)

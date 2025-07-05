@@ -28,7 +28,8 @@ from transformers import BertTokenizerFast
 
 def load_model(kwargs, weights=None):
 
-    model_name = "kobert" if kwargs["language"] == "kr" else "bert-base-uncased"
+    # model_name = "kobert" if kwargs["language"] == "kr" else "bert-base-uncased"
+    model_name = kwargs.get("model_name", "bert-base-uncased")
     tokenizer = BertTokenizerFast.from_pretrained(model_name)
 
     if weights is not None:
@@ -192,7 +193,7 @@ def predict(data, weights, batch_size, language):
 
     num_classes = len(data["classes"])
 
-    model_kwargs = {"num_classes": num_classes, "language": language}
+    model_kwargs = {"num_classes": num_classes, "language": language, "model_name": args.student_model}
     model, tokenizer = load_model(model_kwargs, weights)
 
     # Load dataset.
@@ -294,6 +295,9 @@ if __name__ == "__main__":
         help="en or kr",
     )
     parser.add_argument("-s", "--seed", default=42, help="Random seed")
+    parser.add_argument(
+        "--student_model", default="bert-base-uncased", help="HuggingFace model name"
+    )
     args = parser.parse_args()
 
     with open(args.data_file) as rf:

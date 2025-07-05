@@ -214,7 +214,7 @@ if __name__ == "__main__":
         out_sample = {
             "label": sample["label"],
             "prediction": prediction.item(),
-            "confidence": probs,
+            "confidence": prob,
             "text": sample["text"],
         }
         samples.append(out_sample)

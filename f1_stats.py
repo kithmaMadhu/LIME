@@ -50,7 +50,7 @@ if __name__ == "__main__":
         data[model_key]["micro"] = micro
         data[model_key]["macro"] = macro
 
-    models = ["entailment", "nsp", "rnsp", "qa", "qa_what", "xclass", "lotclass"]
+    models = ["entailment", "nsp", "rnsp", "qa", "qa_what", "xclass", "lotclass", "student"]
     diffs = {
         model: {"macro_diff": [], "micro_diff": [], "avg_diff": []} for model in models
     }
@@ -66,6 +66,8 @@ if __name__ == "__main__":
             avg_normal = (micro_normal + macro_normal) / 2
 
             model_key_soft = get_model_key(dataset, model, 0, True)
+            if model_key_soft not in data:
+                continue
             micro_soft = data[model_key_soft]["micro"]
             macro_soft = data[model_key_soft]["macro"]
             avg_soft = (micro_soft + macro_soft) / 2
@@ -94,3 +96,19 @@ if __name__ == "__main__":
             sum(avg) / len(avg),
             len(micro),
         )
+
+    save_dataset = "agnews"
+    save_model = "conf_weighted"
+    model_key = get_model_key(save_dataset, save_model, 0, False)
+
+    if model_key in data:
+        os.makedirs(f"results/{save_dataset}", exist_ok=True)
+        save_path = f"results/{save_dataset}/{save_model}.json"
+        with open(save_path, "w") as f:
+            json.dump({
+                "micro": data[model_key]["micro"],
+                "macro": data[model_key]["macro"]
+            }, f, indent=2)
+        print(f"Saved {save_model} results to {save_path}")
+    else:
+        print(f"No data found for model {save_model} in dataset {save_dataset}")
