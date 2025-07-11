@@ -24,7 +24,7 @@ from pytorch_lightning.plugins import DDPPlugin, DDPShardedPlugin
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast
-
+from sklearn.metrics import f1_score
 
 def load_model(kwargs, weights=None):
 
@@ -113,13 +113,13 @@ def train(
         filtered = [
             sample
             for sample in data["data"]
-            if sample["confidence"][sample["prediction"]] >= confidence_threshold
+            if sample["confidence"] >= confidence_threshold
         ]
     data["data"] = filtered
     # class_weights = get_class_weights(data)
     class_weights = None
 
-    training_steps = len(data["data"]) // grad_batches // trainer.devices * max_epochs
+    training_steps = len(data["data"]) // grad_batches // trainer.num_devices * max_epochs
     # warmup_steps = int(training_steps * 0.01)
     warmup_steps = int(training_steps * warmup_ratio)
     print("============================================")
@@ -173,6 +173,7 @@ def train(
     best_model_path = checkpoint_callback.best_model_path
     if trainer.is_global_zero:
         print(f"Best model checkpoint: {best_model_path}")
+        os.makedirs("models", exist_ok=True)
         shutil.move(best_model_path, f"models/{version}.bin")
         print(f"Best model saved as", f"models/{version}.bin")
         print("SAVED, PID", os.getpid())
@@ -189,7 +190,7 @@ def train(
     return best_model_path
 
 
-def predict(data, weights, batch_size, language):
+def predict(data, weights, batch_size, language, name):
 
     num_classes = len(data["classes"])
 
@@ -220,7 +221,8 @@ def predict(data, weights, batch_size, language):
     out = trainer.predict(model, dataloaders=test_dataloader)
 
     # indices = torch.cat([i for i, _ in out])
-    preds = torch.cat([p for _, p in out]).tolist()
+    # preds = torch.cat([p for _, p in out]).tolist()
+    preds = torch.cat(out).tolist()
     # preds = [data["classes"][pred] for pred in preds]
     # For DDP. When DP is finally discontinued.
     # if trainer.is_global_zero:
@@ -235,6 +237,20 @@ def predict(data, weights, batch_size, language):
     # if trainer.is_global_zero:
     # print(gathered_indices.shape)
     # print(gathered_preds.shape)
+    golds = [sample["label"] for sample in data["data"]]
+
+    # ✅ F1 calculation
+    micro = f1_score(golds, preds, average="micro")
+    macro = f1_score(golds, preds, average="macro")
+
+    print("Micro F1:", micro)
+    print("Macro F1:", macro)
+
+    # ✅ Save to results/agnews/conf_weighted.json
+    results_dir = os.path.join("results", "agnews")
+    os.makedirs(results_dir, exist_ok=True)
+    with open(os.path.join(results_dir, "conf_weighted.json"), "w") as f:
+      json.dump({"micro": micro, "macro": macro}, f, indent=2)
 
     return preds
 
@@ -326,4 +342,5 @@ if __name__ == "__main__":
             args.weights,
             args.batch_size,
             args.language,
+            args.name
         )

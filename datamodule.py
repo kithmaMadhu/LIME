@@ -39,7 +39,7 @@ class PseudoDataset(Dataset):
         item = {
             "input_ids": input_ids,
             "attention_mask": input_mask,
-            "label": torch.tensor(sample["prediction"])
+            "label": torch.tensor(label)
             }
 
         # Handle confidence weight if present

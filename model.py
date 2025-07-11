@@ -4,7 +4,7 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
-from pytorch_lightning.core.lightning import LightningModule
+from pytorch_lightning import LightningModule
 from torch import optim
 from transformers import BertForSequenceClassification
 
@@ -38,15 +38,17 @@ class BertCategorizerModel(LightningModule):
         for param in self.model.bert.embeddings.parameters():
             param.requires_grad = False
 
-    def forward(self, input_ids, input_mask):
-        x = self.model(input_ids=input_ids, attention_mask=input_mask)
-        return x
+    def forward(self, input_ids, attention_mask=None, token_type_ids=None):
+        return self.model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
 
     def run_batch(self, batch, batch_idx, predicting=False):
-        label, confidence, input_ids, input_mask = batch
+        input_ids = batch["input_ids"]
+        input_mask = batch["attention_mask"]
+        label = batch["label"]
+        confidence = batch.get("weight", torch.ones_like(label).float())
         target = confidence if self.use_soft_labels else label
 
-        out = self(input_ids, input_mask).logits
+        out = self(input_ids=input_ids, attention_mask=input_mask).logits
         if not predicting:
             loss = self.ce_loss(out.view(-1, self.num_classes), target)
         else:
@@ -59,7 +61,7 @@ class BertCategorizerModel(LightningModule):
         labels = batch["label"]
         weights = batch.get("weight", torch.ones_like(labels).float())
 
-        logits = self(input_ids=input_ids, attention_mask=attention_mask)
+        logits = self(input_ids=input_ids, attention_mask=attention_mask).logits
         loss_fn = torch.nn.CrossEntropyLoss(reduction='none')
         losses = loss_fn(logits, labels)
         weighted_loss = (losses * weights).mean()
@@ -75,13 +77,12 @@ class BertCategorizerModel(LightningModule):
     def test_step(self, batch, batch_idx):
         loss, out = self.run_batch(batch, batch_idx)
         self.log("test_loss", loss)
-        return loss, indices, preds
+        return loss
 
     def predict_step(self, batch, batch_idx):
         _, out = self.run_batch(batch, batch_idx, predicting=True)
-        indices = batch[0]
         preds = out.argmax(dim=-1)
-        return indices, preds
+        return preds
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(), lr=self.learning_rate)
@@ -89,7 +90,6 @@ class BertCategorizerModel(LightningModule):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-a", "--argument", help="Example argument")
     args = parser.parse_args()

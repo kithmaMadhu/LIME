@@ -2,9 +2,14 @@ import argparse
 import itertools
 from collections import defaultdict
 from pathlib import Path
-
+import json
 
 def get_model_key(dataset, model, threshold, is_soft):
+    if "conf_weighted" in str(data_file):
+      dataset = "agnews"
+      model = "student"
+      is_soft = True
+      threshold = 0.0
     model_key = f"{dataset}_{model}_{float(threshold)}"
     model_key = f"{model_key}_soft" if is_soft else model_key
     return model_key
@@ -16,14 +21,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data = defaultdict(dict)
-    for data_file in Path(args.data_directory).glob("**/*.txt"):
+    for data_file in Path(args.data_directory).glob("**/*.json"):
         if "supervised" in str(data_file):
             continue
         with open(data_file) as rf:
-            text = rf.readlines()[1]
-        macro_text, micro_text = text.strip().split(",")
-        macro = float(macro_text.strip())
-        micro = float(micro_text.strip())
+          metrics = json.load(rf)
+        micro = float(metrics["micro"])
+        macro = float(metrics["macro"])
 
         properties = data_file.stem.split("_")
         dataset = properties[0]
@@ -32,7 +36,10 @@ if __name__ == "__main__":
         else:
             model = properties[1]
         is_soft = properties[-1] == "soft"
-        threshold = float(properties[-2]) if is_soft else float(properties[-1])
+        try:
+          threshold = float(properties[-2]) if is_soft else float(properties[-1])
+        except ValueError:
+          threshold = 0.0 # fallback for cases like 'conf_weighted'
         model_key = get_model_key(dataset, model, threshold, is_soft)
 
         data[model_key]["micro"] = micro
@@ -92,7 +99,7 @@ if __name__ == "__main__":
                 table_row.append(score_text)
             #tab = "\t"
             tab = " & "
-            row_text = f"{tab.join(table_row)}"
+            row_text = f"{tab.join(str(cell) if cell is not None else 'N/A' for cell in table_row)}"
             row_texts.append(row_text)
         print("\n".join(row_texts) + "\n\n")
 
