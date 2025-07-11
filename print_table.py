@@ -5,11 +5,6 @@ from pathlib import Path
 import json
 
 def get_model_key(dataset, model, threshold, is_soft):
-    if "conf_weighted" in str(data_file):
-      dataset = "agnews"
-      model = "student"
-      is_soft = True
-      threshold = 0.0
     model_key = f"{dataset}_{model}_{float(threshold)}"
     model_key = f"{model_key}_soft" if is_soft else model_key
     return model_key
@@ -29,17 +24,23 @@ if __name__ == "__main__":
         micro = float(metrics["micro"])
         macro = float(metrics["macro"])
 
-        properties = data_file.stem.split("_")
-        dataset = properties[0]
-        if "qa_what" in str(data_file) or "qa_article" in str(data_file):
-            model = "_".join(properties[1:3])
+        if "conf_weighted" in str(data_file):
+          dataset = "agnews"
+          model = "student"
+          is_soft = True
+          threshold = 0.0
         else:
-            model = properties[1]
-        is_soft = properties[-1] == "soft"
-        try:
-          threshold = float(properties[-2]) if is_soft else float(properties[-1])
-        except ValueError:
-          threshold = 0.0 # fallback for cases like 'conf_weighted'
+          properties = data_file.stem.split("_")
+          dataset = properties[0]
+          if "qa_what" in str(data_file) or "qa_article" in str(data_file):
+              model = "_".join(properties[1:3])
+          else:
+              model = properties[1]
+          is_soft = properties[-1] == "soft"
+          try:
+            threshold = float(properties[-2]) if is_soft else float(properties[-1])
+          except ValueError:
+            threshold = 0.0 # fallback for cases like 'conf_weighted'
         model_key = get_model_key(dataset, model, threshold, is_soft)
 
         data[model_key]["micro"] = micro
@@ -83,6 +84,7 @@ if __name__ == "__main__":
                     macro = data[model_key]["macro"]
 
                     if model_type == "soft":
+                      if hard_model_key in data:
                         hard_micro = data[hard_model_key]["micro"]
                         hard_macro = data[hard_model_key]["macro"]
                         micro_diff = (micro - hard_micro) * 100
@@ -92,7 +94,7 @@ if __name__ == "__main__":
                         score_text = f"{micro*100:.2f} ({micro_sign}{abs(micro_diff):.2f}) / {macro*100:.2f} ({macro_sign}{abs(macro_diff):.2f})"
                         micro_diffs[(dataset, model)] += micro_diff
                         macro_diffs[(dataset, model)] += macro_diff
-                    else:
+                      else:
                         score_text = f"{micro*100:.2f} / {macro*100:.2f}"
                 else:
                     score_text = None
